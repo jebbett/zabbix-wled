@@ -20,3 +20,6 @@ EXAMPLE: [8,18],[26,29],[48,51]
 1. This only outputs to the first segment of an LED strip (if you are using a segments in WLED)
 2. It does not retain alerts if WLED triggers a different effect.
 3. If a host has two alerts then only the latest alert will be represented 
+
+![image](https://user-images.githubusercontent.com/16728336/147951998-3e0b5043-287c-432b-b4b6-ab7553028bd1.png)
+

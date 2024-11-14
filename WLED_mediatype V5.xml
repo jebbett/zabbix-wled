@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>5.0</version>
+    <date>2022-01-03T14:06:49Z</date>
+    <media_types>
+        <media_type>
+            <name>WLED</name>
+            <type>WEBHOOK</type>
+            <parameters>
+                <parameter>
+                    <name>ColourAverage</name>
+                    <value>0,255,0</value>
+                </parameter>
+                <parameter>
+                    <name>ColourDisaster</name>
+                    <value>255,0,0</value>
+                </parameter>
+                <parameter>
+                    <name>ColourHigh</name>
+                    <value>255,89,0</value>
+                </parameter>
+                <parameter>
+                    <name>ColourInformation</name>
+                    <value>0,0,255</value>
+                </parameter>
+                <parameter>
+                    <name>ColourNotClassified</name>
+                    <value>255,255,255</value>
+                </parameter>
+                <parameter>
+                    <name>ColourWarning</name>
+                    <value>255,255,0</value>
+                </parameter>
+                <parameter>
+                    <name>DefaultColour</name>
+                    <value>0,0,0</value>
+                </parameter>
+                <parameter>
+                    <name>event_severity</name>
+                    <value>{EVENT.SEVERITY}</value>
+                </parameter>
+                <parameter>
+                    <name>event_value</name>
+                    <value>{EVENT.VALUE}</value>
+                </parameter>
+                <parameter>
+                    <name>HostsList</name>
+                    <value>'SERVER1','SERVER2','SERVER2'</value>
+                </parameter>
+                <parameter>
+                    <name>host_name</name>
+                    <value>{HOST.NAME}</value>
+                </parameter>
+                <parameter>
+                    <name>IPAddress</name>
+                    <value>192.168.1.123</value>
+                </parameter>
+                <parameter>
+                    <name>LEDRanges</name>
+                    <value>[8,18],[26,29],[48,51]</value>
+                </parameter>
+            </parameters>
+            <script>try {
+    var params = JSON.parse(value);
+    
+    switch(params.event_severity) {
+      case 'Not classified':
+        colour = eval('[' + params.ColourNotClassified + ']');
+        break;
+      case 'Information':
+        colour = eval('[' + params.ColourInformation + ']');
+        break;
+      case 'Warning':
+        colour = eval('[' + params.ColourWarning + ']'); 
+        break;
+      case 'Average':
+        colour = eval('[' + params.ColourAverage + ']');
+        break;
+      case 'High':
+        colour = eval('[' + params.ColourHigh + ']');
+        break;
+      case 'Disaster':
+        colour = eval('[' + params.ColourDisaster + ']');
+        break;
+    }
+                
+var defcol = eval('[' + params.DefaultColour + ']'); 
+var ranges = eval('[' + params.LEDRanges + ']');
+var hosts = eval('[' + params.HostsList + ']');
+
+hosts.forEach(function (value, i) {
+    if (value == params.host_name){ 
+        if (params.event_value == 0) { setColour = defcol; } else { setColour = colour; }
+
+        wstart = ranges[i][0]-1;
+        wend = ranges[i][1];
+    
+        var wledparams = {
+            &quot;seg&quot;:{
+                &quot;i&quot;:[wstart, wend, setColour ]
+            }
+        },
+        data,
+        response,
+        request = new CurlHttpRequest(),
+        url = 'http://' + params.IPAddress + '/json/state/';
+        //url = 'https://webhook.site/948de8ee-afea-4fa5-bcaf-bc7cb6f37d7f/';
+
+        request.AddHeader('Content-Type: application/json');
+        data = JSON.stringify(wledparams);
+
+        // Log file.
+        Zabbix.Log(4, '[WLED Webhook] params: ' + data);
+        response = request.Post(url, data);
+        Zabbix.Log(4, '[WLED Webhook] HTTP code: ' + request.Status());
+    }
+});
+    return 'OK';
+}
+catch (error) {
+    Zabbix.Log(4, '[WLED Webhook] notification failed: ' + error);
+    throw 'Sending failed: ' + error + '.';
+}</script>
+            <timeout>10s</timeout>
+            <description>https://github.com/jebbett/zabbix-wled/
+
+IMPORTANT: EVERYTHING IS CASE SENSITIVE, you must complete steps 1-3 below.
+
+1. Set &quot;IPAddress&quot; above to your WLED strip, WLED should be updated to the latest version.
+EXAMPLE: 192.168.1.123
+2. Update &quot;HostsList&quot; with your servers host name as specified in Zabbix, if you need to allocate two sections of the strip to 1 server (i.e. both sides of the rack) then list the server twice.
+EXAMPLE: 'Server1','Server2','Server2'
+3. Update &quot;LEDRanges&quot; for each of the hosts mentioned above, the first LED is LED 1, each host entry requires a start and an end LED number. [Start,End]
+EXAMPLE: [8,18],[26,29],[48,51]
+4. Set custom colours if you require, colours are in standard RGB format
+5. The &quot;DefaultColour&quot; is set when an item is reported as &quot;recovering&quot; (NOTE: event_value = 1 for problem, 0 for recovering)
+
+Example how to use this Media Type:
+1. Add the media type to your user (Administration &gt; Media Users &gt; [User] &gt; Media)
+2. Enable an action to trigger events i.e. enable Configuration &gt; Actions &gt;  &quot;Report problems to Zabbix administrators&quot; with an operation type of &quot;Send Message&quot; and for &quot;Recovery operations&quot; you can use &quot;Notify all involved&quot;
+
+Limitations:
+1. This only outputs to the first segment of an LED strip (if you are using a segments in WLED)
+2. It does not retain alerts if WLED triggers a different effect.
+3. If a host has two alerts then only the latest alert will be represented 
+</description>
+            <message_templates>
+                <message_template>
+                    <event_source>TRIGGERS</event_source>
+                    <operation_mode>PROBLEM</operation_mode>
+                    <subject>Problem: {EVENT.NAME}</subject>
+                    <message>Problem started at {EVENT.TIME} on {EVENT.DATE}
+Problem name: {EVENT.NAME}
+Host: {HOST.NAME}
+Severity: {EVENT.SEVERITY}
+Operational data: {EVENT.OPDATA}
+Original problem ID: {EVENT.ID}
+{TRIGGER.URL}</message>
+                </message_template>
+                <message_template>
+                    <event_source>TRIGGERS</event_source>
+                    <operation_mode>RECOVERY</operation_mode>
+                    <subject>Resolved in {EVENT.DURATION}: {EVENT.NAME}</subject>
+                    <message>Problem has been resolved in {EVENT.DURATION} at {EVENT.RECOVERY.TIME} on {EVENT.RECOVERY.DATE}
+Problem name: {EVENT.NAME}
+Host: {HOST.NAME}
+Severity: {EVENT.SEVERITY}
+Original problem ID: {EVENT.ID}
+{TRIGGER.URL}</message>
+                </message_template>
+                <message_template>
+                    <event_source>TRIGGERS</event_source>
+                    <operation_mode>UPDATE</operation_mode>
+                    <subject>Updated problem: {EVENT.NAME}</subject>
+                    <message>{USER.FULLNAME} {EVENT.UPDATE.ACTION} problem at {EVENT.UPDATE.DATE} {EVENT.UPDATE.TIME}.
+{EVENT.UPDATE.MESSAGE}
+
+Current problem status is {EVENT.STATUS}, acknowledged: {EVENT.ACK.STATUS}.</message>
+                </message_template>
+                <message_template>
+                    <event_source>DISCOVERY</event_source>
+                    <operation_mode>PROBLEM</operation_mode>
+                    <subject>Discovery: {DISCOVERY.DEVICE.STATUS} {DISCOVERY.DEVICE.IPADDRESS}</subject>
+                    <message>Discovery rule: {DISCOVERY.RULE.NAME}
+
+Device IP: {DISCOVERY.DEVICE.IPADDRESS}
+Device DNS: {DISCOVERY.DEVICE.DNS}
+Device status: {DISCOVERY.DEVICE.STATUS}
+Device uptime: {DISCOVERY.DEVICE.UPTIME}
+
+Device service name: {DISCOVERY.SERVICE.NAME}
+Device service port: {DISCOVERY.SERVICE.PORT}
+Device service status: {DISCOVERY.SERVICE.STATUS}
+Device service uptime: {DISCOVERY.SERVICE.UPTIME}</message>
+                </message_template>
+                <message_template>
+                    <event_source>AUTOREGISTRATION</event_source>
+                    <operation_mode>PROBLEM</operation_mode>
+                    <subject>Autoregistration: {HOST.HOST}</subject>
+                    <message>Host name: {HOST.HOST}
+Host IP: {HOST.IP}
+Agent port: {HOST.PORT}</message>
+                </message_template>
+            </message_templates>
+        </media_type>
+    </media_types>
+</zabbix_export>
